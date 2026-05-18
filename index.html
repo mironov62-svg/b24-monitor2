@@ -1,0 +1,928 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мониторинг сделок Битрикс24</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e2a3a 0%, #0f1724 100%);
+            color: #e0e6ed;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { margin-bottom: 30px; }
+        .header h1 { font-size: 28px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+        .header h1 span { color: #2ecc71; }
+        .header p { color: #8b98a8; font-size: 14px; }
+        
+        .controls { display: flex; gap: 12px; margin-bottom: 30px; flex-wrap: wrap; align-items: center; }
+        .btn {
+            padding: 12px 24px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 500; cursor: pointer;
+            transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;
+        }
+        .btn-primary { background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(46,204,113,0.4); }
+        .btn-secondary { background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; }
+        .btn-secondary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(52,152,219,0.4); }
+        .btn-logout { background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; }
+        .btn-logout:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(231,76,60,0.4); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .month-select {
+            background: rgba(30,42,58,0.8);
+            border: 1px solid rgba(139,152,168,0.2);
+            color: #e0e6ed;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+        }
+        .month-select:focus { border-color: #2ecc71; }
+        
+        .card {
+            background: rgba(30,42,58,0.6); border: 1px solid rgba(139,152,168,0.1);
+            border-radius: 12px; padding: 24px; margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        .card-header {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px; padding-bottom: 16px;
+            border-bottom: 1px solid rgba(139,152,168,0.1);
+        }
+        .card-icon {
+            width: 40px; height: 40px; background: rgba(46,204,113,0.1);
+            border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #2ecc71;
+        }
+        .card-title { font-size: 18px; font-weight: 600; color: #fff; }
+        .card-subtitle { font-size: 13px; color: #8b98a8; margin-top: 2px; }
+        
+        .engineer-list { display: flex; flex-direction: column; gap: 12px; }
+        
+        .engineer-item {
+            background: rgba(15,23,36,0.6);
+            border: 1px solid rgba(139,152,168,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .engineer-item:hover { border-color: rgba(46,204,113,0.3); }
+        
+        .engineer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .engineer-header:hover { background: rgba(46,204,113,0.05); }
+        
+        .engineer-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e0e6ed;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .engineer-count {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 16px;
+            min-width: 40px;
+            text-align: center;
+        }
+        .engineer-arrow {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+            color: #8b98a8;
+            margin-left: 10px;
+        }
+        .engineer-item.expanded .engineer-arrow { transform: rotate(180deg); }
+        
+        .engineer-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: rgba(0,0,0,0.2);
+        }
+        .engineer-item.expanded .engineer-details { max-height: 1000px; }
+        
+        .devices-list {
+            padding: 15px 20px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .device-item {
+            background: rgba(30,42,58,0.8);
+            border: 1px solid rgba(139,152,168,0.1);
+            border-radius: 8px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .device-item:hover {
+            border-color: rgba(52,152,219,0.3);
+            transform: translateX(4px);
+        }
+        .device-name {
+            font-size: 14px;
+            color: #e0e6ed;
+            flex: 1;
+        }
+        .device-date {
+            font-size: 13px;
+            color: #8b98a8;
+            margin: 0 15px;
+        }
+        .device-link {
+            background: rgba(52,152,219,0.1);
+            color: #3498db;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            min-width: 60px;
+            text-align: center;
+        }
+        .device-link:hover {
+            background: rgba(52,152,219,0.2);
+            color: #5dade2;
+        }
+        
+        .total-footer {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(52,152,219,0.1) 0%, rgba(41,128,185,0.1) 100%);
+            border: 1px solid rgba(52,152,219,0.3);
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .total-label {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e0e6ed;
+        }
+        .total-value {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 20px;
+        }
+        
+        .loading { display: none; text-align: center; padding: 40px; color: #8b98a8; }
+        .loading.active { display: block; }
+        .spinner {
+            border: 3px solid rgba(46,204,113,0.1); border-top-color: #2ecc71;
+            border-radius: 50%; width: 40px; height: 40px;
+            animation: spin 1s linear infinite; margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .error {
+            background: rgba(231,76,60,0.1); border: 1px solid rgba(231,76,60,0.3);
+            color: #e74c3c; padding: 16px; border-radius: 8px; margin-bottom: 20px; display: none;
+        }
+        .error.active { display: block; }
+        .empty-state { text-align: center; padding: 60px 20px; color: #8b98a8; }
+        .empty-state-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+        .total-badge {
+            background: rgba(52,152,219,0.1); color: #3498db;
+            padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 500; margin-left: 12px;
+        }
+        .no-data {
+            text-align: center;
+            padding: 40px;
+            color: #8b98a8;
+            font-style: italic;
+        }
+        .auto-save-badge {
+            background: rgba(155,89,182,0.2);
+            color: #9b59b6;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        /* ========== СТИЛИ ДЛЯ ЭКРАНА АВТОРИЗАЦИИ ========== */
+        .auth-screen {
+            max-width: 500px;
+            margin: 100px auto;
+            background: rgba(30,42,58,0.8);
+            border: 1px solid rgba(139,152,168,0.2);
+            border-radius: 20px;
+            padding: 40px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+        .auth-screen h2 {
+            color: #fff;
+            margin-bottom: 16px;
+        }
+        .auth-screen p {
+            color: #8b98a8;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .auth-input {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(15,23,36,0.8);
+            border: 1px solid rgba(139,152,168,0.3);
+            border-radius: 10px;
+            color: #e0e6ed;
+            font-size: 14px;
+            font-family: monospace;
+            margin-bottom: 20px;
+            outline: none;
+            text-align: center;
+            letter-spacing: 1px;
+        }
+        .auth-input:focus {
+            border-color: #2ecc71;
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(46,204,113,0.4);
+        }
+        .auth-error {
+            background: rgba(231,76,60,0.2);
+            color: #e74c3c;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            display: none;
+        }
+        .auth-error.active {
+            display: block;
+        }
+
+        /* Скрытие основного контента до авторизации */
+        .main-content {
+            display: none;
+        }
+        .main-content.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- ЭКРАН АВТОРИЗАЦИИ -->
+    <div id="authScreen" class="auth-screen">
+        <h2>🔐 Вход в систему</h2>
+        <p>Введите ваш персональный API-ключ для доступа к мониторингу сделок</p>
+        <input type="password" id="apiKeyInput" class="auth-input" placeholder="Введите ваш API-ключ" autocomplete="off">
+        <button id="authButton" class="auth-btn">Войти</button>
+        <div id="authError" class="auth-error"></div>
+    </div>
+
+    <!-- ОСНОВНОЙ КОНТЕНТ (изначально скрыт) -->
+    <div id="mainContent" class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1>Мониторинг сделок <span>Битрикс24</span></h1>
+                <p>Контроль заявок по сервисным показателям <span class="auto-save-badge">Автосохранение месяцев</span></p>
+            </div>
+
+            <div class="controls">
+                <button class="btn btn-primary" id="startBtn" onclick="loadData()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Пуск
+                </button>
+                <button class="btn btn-secondary" id="refreshBtn" onclick="loadData()" disabled>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                    </svg>
+                    Обновить
+                </button>
+                <button class="btn btn-logout" id="logoutBtn" onclick="logout()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Сменить ключ
+                </button>
+                <select class="month-select" id="monthSelect" onchange="loadMonthData()">
+                    <option value="current">Текущий месяц</option>
+                </select>
+            </div>
+
+            <div class="error" id="errorBlock"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Загрузка данных...</p>
+            </div>
+
+            <div class="card" id="resultsCard" style="display: none;">
+                <div class="card-header">
+                    <div class="card-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="card-title">Статистика инженеров <span class="total-badge" id="totalBadge">0 заявок</span></div>
+                        <div class="card-subtitle" id="monthSubtitle">Итоги за текущий месяц</div>
+                    </div>
+                </div>
+                <div class="engineer-list" id="engineerList"></div>
+                
+                <div class="total-footer" id="totalFooter" style="display: none;">
+                    <div class="total-label">Итого за месяц:</div>
+                    <div class="total-value" id="totalValue">0</div>
+                </div>
+            </div>
+
+            <div class="empty-state" id="emptyState">
+                <div class="empty-state-icon">📊</div>
+                <p>Нажмите "Пуск" для загрузки данных</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // КОНФИГУРАЦИЯ
+        // ============================================
+        const WEBHOOK_URL = 'https://n8n.gmtnsk.ru/webhook/b05542eb-b922-42ec-a860-37ab51c3247a';
+        const STORAGE_KEY = 'b24_engineer_stats';
+        const AUTH_STORAGE_KEY = 'userApiKey';
+        
+        // Список инженеров
+        const engineers = [
+            'Боянов',
+            'Миронов',
+            'Елагин',
+            'Стяжкин',
+            'Сосновский',
+            'Бурлаков',
+            'Федяев',
+            'Федосеев',
+            'Чащин'
+        ];
+
+        const monthNames = [
+            'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+            'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+        ];
+
+        let currentData = null;
+        let currentMonthKey = null;
+        let allItems = [];
+
+        // ============================================
+        // ФУНКЦИИ АВТОРИЗАЦИИ (ИСПРАВЛЕНЫ)
+        // ============================================
+        
+        // Получить сохранённый ключ
+        function getStoredApiKey() {
+            return localStorage.getItem(AUTH_STORAGE_KEY);
+        }
+
+        // Сохранить ключ
+        function setStoredApiKey(key) {
+            if (key) {
+                localStorage.setItem(AUTH_STORAGE_KEY, key);
+            } else {
+                localStorage.removeItem(AUTH_STORAGE_KEY);
+            }
+        }
+
+        // Проверка ключа (вызов тестового эндпоинта)
+        async function verifyApiKey(apiKey) {
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': apiKey
+                    },
+                    body: JSON.stringify({ action: 'verify' })
+                });
+                
+                return response.ok;
+            } catch (error) {
+                console.error('Verification error:', error);
+                return false;
+            }
+        }
+
+        // Проверка авторизации при загрузке страницы
+        async function checkAuth() {
+            const authScreen = document.getElementById('authScreen');
+            const mainContent = document.getElementById('mainContent');
+            const apiKey = getStoredApiKey();
+            
+            if (!apiKey) {
+                authScreen.style.display = 'block';
+                mainContent.classList.remove('visible');
+                return false;
+            }
+            
+            const isValid = await verifyApiKey(apiKey);
+            
+            if (isValid) {
+                authScreen.style.display = 'none';
+                mainContent.classList.add('visible');
+                return true;
+            } else {
+                setStoredApiKey(null);
+                authScreen.style.display = 'block';
+                mainContent.classList.remove('visible');
+                showAuthError('Неверный или просроченный ключ. Введите заново.');
+                return false;
+            }
+        }
+
+        function showAuthError(message) {
+            const errorDiv = document.getElementById('authError');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+            setTimeout(() => {
+                errorDiv.classList.remove('active');
+            }, 5000);
+        }
+
+        function logout() {
+            setStoredApiKey(null);
+            currentData = null;
+            currentMonthKey = null;
+            allItems = [];
+            document.getElementById('authScreen').style.display = 'block';
+            document.getElementById('mainContent').classList.remove('visible');
+            document.getElementById('apiKeyInput').value = '';
+        }
+
+        async function handleLogin() {
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const apiKey = apiKeyInput.value.trim();
+            const authButton = document.getElementById('authButton');
+            
+            if (!apiKey) {
+                showAuthError('Пожалуйста, введите API-ключ');
+                return;
+            }
+            
+            authButton.disabled = true;
+            authButton.textContent = 'Проверка...';
+            
+            const isValid = await verifyApiKey(apiKey);
+            
+            if (isValid) {
+                setStoredApiKey(apiKey);
+                document.getElementById('authScreen').style.display = 'none';
+                document.getElementById('mainContent').classList.add('visible');
+                loadData();
+            } else {
+                showAuthError('Неверный API-ключ. Проверьте правильность ввода.');
+                apiKeyInput.value = '';
+                apiKeyInput.focus();
+            }
+            
+            authButton.disabled = false;
+            authButton.textContent = 'Войти';
+        }
+
+        // ============================================
+        // ФУНКЦИИ ПРИЛОЖЕНИЯ
+        // ============================================
+        
+        async function authenticatedFetch(url, options = {}) {
+            const apiKey = getStoredApiKey();
+            if (!apiKey) {
+                throw new Error('No API key');
+            }
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                ...options.headers
+            };
+            
+            const response = await fetch(url, {
+                ...options,
+                headers: headers
+            });
+            
+            if (response.status === 401) {
+                setStoredApiKey(null);
+                document.getElementById('authScreen').style.display = 'block';
+                document.getElementById('mainContent').classList.remove('visible');
+                showAuthError('Сессия истекла. Введите ключ заново.');
+                throw new Error('Unauthorized');
+            }
+            
+            return response;
+        }
+
+        function getMonthKey(date = new Date()) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function getMonthName(monthKey) {
+            const [year, month] = monthKey.split('-');
+            return `${monthNames[parseInt(month) - 1]} ${year}`;
+        }
+
+        function loadSavedMonths() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            const monthSelect = document.getElementById('monthSelect');
+            
+            monthSelect.innerHTML = '<option value="current">Текущий месяц</option>';
+            
+            if (saved) {
+                const data = JSON.parse(saved);
+                const months = Object.keys(data).sort().reverse();
+                
+                months.forEach(month => {
+                    const option = document.createElement('option');
+                    option.value = month;
+                    option.textContent = getMonthName(month);
+                    monthSelect.appendChild(option);
+                });
+            }
+        }
+
+        function extractItems(data) {
+            if (!data) return [];
+            const responseData = Array.isArray(data) ? data[0] : data;
+            
+            if (responseData?.result?.items && Array.isArray(responseData.result.items)) {
+                return responseData.result.items;
+            }
+            if (responseData?.result && Array.isArray(responseData.result)) {
+                return responseData.result;
+            }
+            if (Array.isArray(responseData)) {
+                return responseData;
+            }
+            return [];
+        }
+
+        function autoSaveByMonths(items) {
+            if (!items || items.length === 0) return;
+            
+            const dealsByMonth = {};
+            
+            items.forEach(item => {
+                const engineerName = item.ufCrm52_1776580279;
+                const deviceName = item.ufCrm52_1776580300;
+                const dateStr = item.ufCrm52_1776580313;
+                const deviceId = item.ufCrm52_1776582412;
+
+                if (dateStr && engineerName) {
+                    const [d, m, y] = dateStr.split('.').map(Number);
+                    if (isNaN(d) || isNaN(m) || isNaN(y)) return;
+                    
+                    const itemDate = new Date(y, m - 1, d);
+                    if (isNaN(itemDate.getTime())) return;
+                    
+                    const monthKey = getMonthKey(itemDate);
+                    
+                    if (!dealsByMonth[monthKey]) {
+                        dealsByMonth[monthKey] = [];
+                    }
+                    
+                    dealsByMonth[monthKey].push({
+                        engineerName: engineerName,
+                        deviceName: deviceName,
+                        dateStr: dateStr,
+                        deviceId: deviceId
+                    });
+                }
+            });
+            
+            const saved = localStorage.getItem(STORAGE_KEY);
+            const allSavedData = saved ? JSON.parse(saved) : {};
+            let changed = false;
+            
+            for (const [monthKey, monthDeals] of Object.entries(dealsByMonth)) {
+                const engineerData = {};
+                engineers.forEach(e => engineerData[e] = { count: 0, devices: [] });
+                
+                monthDeals.forEach(deal => {
+                    engineers.forEach(engineer => {
+                        if (deal.engineerName.includes(engineer)) {
+                            engineerData[engineer].count++;
+                            engineerData[engineer].devices.push({
+                                name: deal.deviceName || 'Не указано',
+                                date: deal.dateStr,
+                                id: deal.deviceId
+                            });
+                        }
+                    });
+                });
+                
+                for (const eng in engineerData) {
+                    engineerData[eng].devices.sort((a, b) => {
+                        const [da, ma, ya] = a.date.split('.').map(Number);
+                        const [db, mb, yb] = b.date.split('.').map(Number);
+                        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                    });
+                }
+                
+                const total = Object.values(engineerData).reduce((sum, e) => sum + e.count, 0);
+                
+                const monthData = {
+                    timestamp: new Date().toISOString(),
+                    engineers: engineerData,
+                    total: total,
+                    lastUpdated: Date.now()
+                };
+                
+                const existingMonth = allSavedData[monthKey];
+                if (!existingMonth || existingMonth.total !== total) {
+                    allSavedData[monthKey] = monthData;
+                    changed = true;
+                }
+            }
+            
+            if (changed) {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(allSavedData));
+                console.log('✅ Автоматически сохранены месяцы:', Object.keys(dealsByMonth));
+                loadSavedMonths();
+            }
+        }
+
+        async function loadData() {
+            const loading = document.getElementById('loading');
+            const errorBlock = document.getElementById('errorBlock');
+            const resultsCard = document.getElementById('resultsCard');
+            const emptyState = document.getElementById('emptyState');
+            const startBtn = document.getElementById('startBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            loading.classList.add('active');
+            errorBlock.classList.remove('active');
+            resultsCard.style.display = 'none';
+            emptyState.style.display = 'none';
+            startBtn.disabled = true;
+            refreshBtn.disabled = true;
+
+            try {
+                const response = await authenticatedFetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'fetch_deals' })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+                const data = await response.json();
+                const items = extractItems(data);
+                
+                allItems = items;
+                currentData = { result: { items: items } };
+                currentMonthKey = getMonthKey();
+                
+                autoSaveByMonths(items);
+                processData(currentData, currentMonthKey);
+                
+                resultsCard.style.display = 'block';
+                refreshBtn.disabled = false;
+                document.getElementById('monthSelect').value = 'current';
+                
+            } catch (error) {
+                if (error.message === 'Unauthorized') {
+                    return;
+                }
+                console.error('Error:', error);
+                errorBlock.textContent = `Ошибка: ${error.message}`;
+                errorBlock.classList.add('active');
+                emptyState.style.display = 'block';
+            } finally {
+                loading.classList.remove('active');
+                startBtn.disabled = false;
+            }
+        }
+
+        function loadMonthData() {
+            const monthSelect = document.getElementById('monthSelect');
+            const selectedValue = monthSelect.value;
+            
+            if (selectedValue === 'current') {
+                if (currentData) {
+                    processData(currentData, currentMonthKey);
+                } else {
+                    loadData();
+                }
+            } else {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    if (data[selectedValue]) {
+                        displaySavedData(data[selectedValue], selectedValue);
+                    } else {
+                        displayResults({}, selectedValue);
+                    }
+                }
+            }
+        }
+
+        function processData(data, monthKey) {
+            const engineerData = {};
+            engineers.forEach(e => engineerData[e] = { count: 0, devices: [] });
+
+            const [targetYear, targetMonth] = monthKey.split('-').map(Number);
+            const items = extractItems(data);
+            const currentMonthDeals = [];
+            
+            items.forEach(item => {
+                const engineerName = item.ufCrm52_1776580279;
+                const deviceName = item.ufCrm52_1776580300;
+                const dateStr = item.ufCrm52_1776580313;
+                const deviceId = item.ufCrm52_1776582412;
+
+                if (dateStr && engineerName) {
+                    const [d, m, y] = dateStr.split('.').map(Number);
+                    if (isNaN(d) || isNaN(m) || isNaN(y)) return;
+                    
+                    const itemDate = new Date(y, m - 1, d);
+                    if (isNaN(itemDate.getTime())) return;
+                    
+                    if (itemDate.getMonth() + 1 === targetMonth && itemDate.getFullYear() === targetYear) {
+                        currentMonthDeals.push({
+                            engineerName, deviceName, dateStr, deviceId
+                        });
+                    }
+                }
+            });
+            
+            currentMonthDeals.forEach(deal => {
+                engineers.forEach(engineer => {
+                    if (deal.engineerName.includes(engineer)) {
+                        engineerData[engineer].count++;
+                        engineerData[engineer].devices.push({
+                            name: deal.deviceName || 'Не указано',
+                            date: deal.dateStr,
+                            id: deal.deviceId
+                        });
+                    }
+                });
+            });
+            
+            for (const eng in engineerData) {
+                engineerData[eng].devices.sort((a, b) => {
+                    const [da, ma, ya] = a.date.split('.').map(Number);
+                    const [db, mb, yb] = b.date.split('.').map(Number);
+                    return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                });
+            }
+            
+            displayResults(engineerData, monthKey);
+        }
+
+        function displaySavedData(savedData, monthKey) {
+            displayResults(savedData.engineers, monthKey);
+        }
+
+        function displayResults(engineerData, monthKey) {
+            const engineerList = document.getElementById('engineerList');
+            const totalBadge = document.getElementById('totalBadge');
+            const totalFooter = document.getElementById('totalFooter');
+            const totalValue = document.getElementById('totalValue');
+            const monthSubtitle = document.getElementById('monthSubtitle');
+            
+            engineerList.innerHTML = '';
+            monthSubtitle.textContent = `Итоги за ${getMonthName(monthKey)}`;
+            
+            let total = 0;
+            
+            const sortedEngineers = engineers
+                .map(name => ({ name, data: engineerData[name] || { count: 0, devices: [] } }))
+                .filter(item => item.data.count > 0)
+                .sort((a, b) => b.data.count - a.data.count);
+            
+            let hasData = sortedEngineers.length > 0;
+            
+            sortedEngineers.forEach(({ name: engineer, data }) => {
+                total += data.count;
+                
+                const item = document.createElement('div');
+                item.className = 'engineer-item';
+                item.innerHTML = `
+                    <div class="engineer-header" onclick="toggleEngineer(this)">
+                        <div class="engineer-name">
+                            ${engineer}
+                            <svg class="engineer-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                        </div>
+                        <div class="engineer-count">${data.count}</div>
+                    </div>
+                    <div class="engineer-details">
+                        <div class="devices-list">
+                            ${data.devices.length > 0 ? data.devices.map(device => `
+                                <div class="device-item">
+                                    <div class="device-name">${escapeHtml(device.name)}</div>
+                                    <div class="device-date">${device.date}</div>
+                                    <a href="https://b24-964ige.bitrix24.ru/crm/deal/show/${device.id}/" target="_blank" class="device-link">
+                                        ${device.id}
+                                    </a>
+                                </div>
+                            `).join('') : '<div class="no-data" style="padding: 20px;">Нет данных</div>'}
+                        </div>
+                    </div>
+                `;
+                engineerList.appendChild(item);
+            });
+            
+            if (!hasData) {
+                engineerList.innerHTML = '<div class="no-data">Нет данных за выбранный месяц</div>';
+            }
+            
+            totalBadge.textContent = `${total} ${declension(total, 'заявка', 'заявки', 'заявок')}`;
+            totalValue.textContent = total;
+            totalFooter.style.display = 'flex';
+        }
+        
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function toggleEngineer(header) {
+            const item = header.closest('.engineer-item');
+            item.classList.toggle('expanded');
+        }
+        
+        function declension(num, one, two, five) {
+            let n = Math.abs(num) % 100;
+            if (n >= 5 && n <= 20) return five;
+            n %= 10;
+            if (n === 1) return one;
+            if (n >= 2 && n <= 4) return two;
+            return five;
+        }
+        
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ============================================
+        
+        window.addEventListener('load', () => {
+            loadSavedMonths();
+            checkAuth();
+        });
+        
+        window.loadData = loadData;
+        window.loadMonthData = loadMonthData;
+        window.toggleEngineer = toggleEngineer;
+        window.logout = logout;
+        
+        document.getElementById('authButton').addEventListener('click', handleLogin);
+        
+        document.getElementById('apiKeyInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    </script>
+</body>
+</html>
