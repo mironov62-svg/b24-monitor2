@@ -259,7 +259,6 @@
             <div class="webhook-status">
                 🔗 Вебхук: <code>https://n8n.gmtnsk.ru/webhook/24c7329a-f4b3-4698-acb1-3600c0a4d2db</code>
                 <br>📡 Метод: <strong>POST</strong> | ⚡ Ответ: <strong>Immediately</strong>
-                <br>📦 Ожидаемый формат: <code>{ result: [...], total: N }</code>
             </div>
 
             <div class="controls">
@@ -557,7 +556,7 @@
                     autoSaveByMonths(testItems);
                     processData(currentData, currentMonthKey);
                     
-                    errorBlock.textContent = '⚠️ Вебхук не вернул данных. Показаны тестовые данные для демонстрации.';
+                    errorBlock.textContent = '⚠️ Вебхук не вернул данных. Показаны тестовые данные.';
                     errorBlock.style.background = 'rgba(155,89,182,0.1)';
                     errorBlock.style.borderColor = 'rgba(155,89,182,0.3)';
                     errorBlock.style.color = '#9b59b6';
@@ -579,11 +578,9 @@
                 
                 let errorMessage = error.message;
                 if (error.message.includes('404')) {
-                    errorMessage = '❌ Вебхук не найден (404).\n\nПроверьте в n8n:\n1️⃣ Воркфлоу должен быть АКТИВИРОВАН (переключатель зеленый)\n2️⃣ Нажмите "Save" → "Activate"\n3️⃣ Путь вебхука: 24c7329a-f4b3-4698-acb1-3600c0a4d2db\n4️⃣ В ноде "Respond to Webhook" должно быть заполнено "Response Body"';
+                    errorMessage = '❌ Вебхук не найден (404).\n\nПроверьте в n8n:\n1. Воркфлоу должен быть АКТИВИРОВАН\n2. Нажмите "Save" → "Activate"\n3. Путь вебхука: 24c7329a-f4b3-4698-acb1-3600c0a4d2db';
                 } else if (error.message.includes('500')) {
-                    errorMessage = '❌ Ошибка сервера (500).\n\nПроверьте в n8n:\n1️⃣ Есть ли нода "Respond to Webhook" в конце воркфлоу?\n2️⃣ Подключена ли она к предыдущей ноде?\n3️⃣ В ноде "Respond to Webhook" заполнено поле "Response Body"';
-                } else if (error.message.includes('Unused Respond')) {
-                    errorMessage = '❌ Ошибка n8n: "Unused Respond to Webhook".\n\nРешение:\n1️⃣ Добавьте ноду "Respond to Webhook" в конец воркфлоу\n2️⃣ Подключите к ней предыдущую ноду (Code)\n3️⃣ В "Response Body" укажите {{ $json }}\n4️⃣ Сохраните и активируйте воркфлоу';
+                    errorMessage = '❌ Ошибка сервера (500).\n\nПроверьте в n8n:\n1. Откройте вкладку "Executions"\n2. Найдите последний запуск воркфлоу\n3. Посмотрите, на какой ноде произошла ошибка\n4. Исправьте ошибку в этой ноде';
                 }
                 
                 errorBlock.textContent = errorMessage;
