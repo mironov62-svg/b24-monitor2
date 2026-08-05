@@ -227,9 +227,7 @@
             vertical-align: middle;
         }
 
-        .main-content {
-            display: block;
-        }
+        .main-content { display: block; }
 
         .webhook-status {
             background: rgba(52,152,219,0.1);
@@ -248,12 +246,6 @@
             font-family: monospace;
             font-size: 12px;
         }
-        .webhook-status .status-ok {
-            color: #2ecc71;
-        }
-        .webhook-status .status-error {
-            color: #e74c3c;
-        }
     </style>
 </head>
 <body>
@@ -264,9 +256,10 @@
                 <p>Контроль заявок по сервисным показателям <span class="auto-save-badge">Автосохранение месяцев</span></p>
             </div>
 
-            <div class="webhook-status" id="webhookStatus">
+            <div class="webhook-status">
                 🔗 Вебхук: <code>https://n8n.gmtnsk.ru/webhook/24c7329a-f4b3-4698-acb1-3600c0a4d2db</code>
                 <br>📡 Метод: <strong>POST</strong> | ⚡ Ответ: <strong>Immediately</strong>
+                <br>📦 Ожидаемый формат: <code>{ result: [...], total: N }</code>
             </div>
 
             <div class="controls">
@@ -343,7 +336,6 @@
 
         let currentData = null;
         let currentMonthKey = null;
-        let allItems = [];
 
         // ============================================
         // ФУНКЦИИ
@@ -410,6 +402,13 @@
         function extractItems(data) {
             if (!data) return [];
             
+            // Ожидаемый формат от Code-ноды: { result: [...], total: N }
+            if (data.result && Array.isArray(data.result)) {
+                console.log('✅ Найден result:', data.result.length, 'элементов');
+                return data.result;
+            }
+            
+            // Если данные пришли в другом формате
             const responseData = Array.isArray(data) ? data[0] : data;
             
             if (responseData?.result?.items && Array.isArray(responseData.result.items)) {
@@ -422,20 +421,20 @@
                 return responseData;
             }
             
-            // Если данные пришли в виде объекта с полями сделок
+            // Если всё ещё нет данных — ищем в любом поле с массивом
             if (typeof responseData === 'object' && responseData !== null) {
-                // Проверяем, есть ли массив где-то внутри
                 for (const key in responseData) {
                     if (Array.isArray(responseData[key]) && responseData[key].length > 0) {
                         const firstItem = responseData[key][0];
-                        if (firstItem && typeof firstItem === 'object' && 
-                            (firstItem.ufCrm52_1776580279 !== undefined || firstItem.ID !== undefined)) {
+                        if (firstItem && typeof firstItem === 'object') {
+                            console.log(`🔍 Найден массив в поле "${key}":`, responseData[key].length, 'элементов');
                             return responseData[key];
                         }
                     }
                 }
             }
             
+            console.warn('⚠️ Не удалось найти массив с данными в ответе');
             return [];
         }
 
@@ -445,14 +444,14 @@
             const dealsByMonth = {};
             
             items.forEach(item => {
-                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID;
-                const deviceName = item.ufCrm52_1776580300 || item.TITLE;
-                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE;
-                const deviceId = item.ufCrm52_1776582412 || item.ID;
+                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID || item.assigned_by_id;
+                const deviceName = item.ufCrm52_1776580300 || item.TITLE || item.title;
+                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE || item.date_create;
+                const deviceId = item.ufCrm52_1776582412 || item.ID || item.id;
 
                 if (dateStr && engineerName) {
                     let parsedDate;
-                    if (dateStr.includes('.')) {
+                    if (typeof dateStr === 'string' && dateStr.includes('.')) {
                         const [d, m, y] = dateStr.split('.').map(Number);
                         parsedDate = new Date(y, m - 1, d);
                     } else {
@@ -468,7 +467,7 @@
                     dealsByMonth[monthKey].push({
                         engineerName: String(engineerName),
                         deviceName: String(deviceName || 'Не указано'),
-                        dateStr: dateStr,
+                        dateStr: String(dateStr),
                         deviceId: String(deviceId || '')
                     });
                 }
@@ -552,20 +551,18 @@
                 if (items.length === 0) {
                     console.warn('⚠️ Нет данных от вебхука, используем тестовые');
                     const testItems = generateTestData();
-                    allItems = testItems;
                     currentData = { result: { items: testItems } };
                     currentMonthKey = getMonthKey();
                     
                     autoSaveByMonths(testItems);
                     processData(currentData, currentMonthKey);
                     
-                    errorBlock.textContent = '⚠️ Вебхук не вернул данных. Показаны тестовые данные.';
+                    errorBlock.textContent = '⚠️ Вебхук не вернул данных. Показаны тестовые данные для демонстрации.';
                     errorBlock.style.background = 'rgba(155,89,182,0.1)';
                     errorBlock.style.borderColor = 'rgba(155,89,182,0.3)';
                     errorBlock.style.color = '#9b59b6';
                     errorBlock.classList.add('active');
                 } else {
-                    allItems = items;
                     currentData = { result: { items: items } };
                     currentMonthKey = getMonthKey();
                     
@@ -582,9 +579,11 @@
                 
                 let errorMessage = error.message;
                 if (error.message.includes('404')) {
-                    errorMessage = '❌ Вебхук не найден (404).\n\nПроверьте в n8n:\n1. Воркфлоу должен быть АКТИВИРОВАН (переключатель зеленый)\n2. Нажмите "Save" → "Activate"\n3. Путь вебхука: 24c7329a-f4b3-4698-acb1-3600c0a4d2db\n4. В ноде "Respond to Webhook" должно быть заполнено "Response Body"';
+                    errorMessage = '❌ Вебхук не найден (404).\n\nПроверьте в n8n:\n1️⃣ Воркфлоу должен быть АКТИВИРОВАН (переключатель зеленый)\n2️⃣ Нажмите "Save" → "Activate"\n3️⃣ Путь вебхука: 24c7329a-f4b3-4698-acb1-3600c0a4d2db\n4️⃣ В ноде "Respond to Webhook" должно быть заполнено "Response Body"';
                 } else if (error.message.includes('500')) {
-                    errorMessage = '❌ Ошибка сервера (500).\n\nПроверьте в n8n:\n1. Есть ли нода "Respond to Webhook" в конце воркфлоу?\n2. Подключена ли она к предыдущей ноде?\n3. В ноде "Respond to Webhook" заполнено поле "Response Body"';
+                    errorMessage = '❌ Ошибка сервера (500).\n\nПроверьте в n8n:\n1️⃣ Есть ли нода "Respond to Webhook" в конце воркфлоу?\n2️⃣ Подключена ли она к предыдущей ноде?\n3️⃣ В ноде "Respond to Webhook" заполнено поле "Response Body"';
+                } else if (error.message.includes('Unused Respond')) {
+                    errorMessage = '❌ Ошибка n8n: "Unused Respond to Webhook".\n\nРешение:\n1️⃣ Добавьте ноду "Respond to Webhook" в конец воркфлоу\n2️⃣ Подключите к ней предыдущую ноду (Code)\n3️⃣ В "Response Body" укажите {{ $json }}\n4️⃣ Сохраните и активируйте воркфлоу';
                 }
                 
                 errorBlock.textContent = errorMessage;
@@ -651,14 +650,14 @@
             const currentMonthDeals = [];
             
             items.forEach(item => {
-                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID;
-                const deviceName = item.ufCrm52_1776580300 || item.TITLE;
-                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE;
-                const deviceId = item.ufCrm52_1776582412 || item.ID;
+                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID || item.assigned_by_id;
+                const deviceName = item.ufCrm52_1776580300 || item.TITLE || item.title;
+                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE || item.date_create;
+                const deviceId = item.ufCrm52_1776582412 || item.ID || item.id;
 
                 if (dateStr && engineerName) {
                     let itemDate;
-                    if (dateStr.includes('.')) {
+                    if (typeof dateStr === 'string' && dateStr.includes('.')) {
                         const [d, m, y] = dateStr.split('.').map(Number);
                         itemDate = new Date(y, m - 1, d);
                     } else {
@@ -671,7 +670,7 @@
                         currentMonthDeals.push({
                             engineerName: String(engineerName),
                             deviceName: String(deviceName || 'Не указано'),
-                            dateStr: dateStr,
+                            dateStr: String(dateStr),
                             deviceId: String(deviceId || '')
                         });
                     }
@@ -804,8 +803,4 @@
         });
         
         window.loadData = loadData;
-        window.loadMonthData = loadMonthData;
-        window.toggleEngineer = toggleEngineer;
-    </script>
-</body>
-</html>
+        window.loadMonthData
