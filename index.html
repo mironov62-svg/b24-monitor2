@@ -200,6 +200,9 @@
         .error {
             background: rgba(231,76,60,0.1); border: 1px solid rgba(231,76,60,0.3);
             color: #e74c3c; padding: 16px; border-radius: 8px; margin-bottom: 20px; display: none;
+            white-space: pre-wrap;
+            font-family: monospace;
+            font-size: 13px;
         }
         .error.active { display: block; }
         .empty-state { text-align: center; padding: 60px 20px; color: #8b98a8; }
@@ -227,6 +230,30 @@
         .main-content {
             display: block;
         }
+
+        .webhook-status {
+            background: rgba(52,152,219,0.1);
+            border: 1px solid rgba(52,152,219,0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #8b98a8;
+        }
+        .webhook-status code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #2ecc71;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .webhook-status .status-ok {
+            color: #2ecc71;
+        }
+        .webhook-status .status-error {
+            color: #e74c3c;
+        }
     </style>
 </head>
 <body>
@@ -235,6 +262,11 @@
             <div class="header">
                 <h1>Мониторинг сделок <span>Битрикс24</span></h1>
                 <p>Контроль заявок по сервисным показателям <span class="auto-save-badge">Автосохранение месяцев</span></p>
+            </div>
+
+            <div class="webhook-status" id="webhookStatus">
+                🔗 Вебхук: <code>https://n8n.gmtnsk.ru/webhook/24c7329a-f4b3-4698-acb1-3600c0a4d2db</code>
+                <br>📡 Метод: <strong>POST</strong> | ⚡ Ответ: <strong>Immediately</strong>
             </div>
 
             <div class="controls">
@@ -300,21 +332,12 @@
         const WEBHOOK_URL = 'https://n8n.gmtnsk.ru/webhook/24c7329a-f4b3-4698-acb1-3600c0a4d2db';
         const STORAGE_KEY = 'b24_engineer_stats';
         
-        // Список инженеров
         const engineers = [
-            'Боянов',
-            'Миронов',
-            'Елагин',
-            'Стяжкин',
-            'Сосновский',
-            'Бурлаков',
-            'Федяев',
-            'Федосеев',
-            'Чащин'
+            'Боянов', 'Миронов', 'Елагин', 'Стяжкин',
+            'Сосновский', 'Бурлаков', 'Федяев', 'Федосеев', 'Чащин'
         ];
 
-        const monthNames = [
-            'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+        const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
             'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
         ];
 
@@ -323,20 +346,22 @@
         let allItems = [];
 
         // ============================================
-        // ФУНКЦИИ ПРИЛОЖЕНИЯ
+        // ФУНКЦИИ
         // ============================================
         
         async function fetchDeals() {
+            console.log('📤 Отправка POST-запроса к вебхуку:', WEBHOOK_URL);
+            
             const response = await fetch(WEBHOOK_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'fetch_deals',
                     timestamp: new Date().toISOString()
                 })
             });
+
+            console.log('📥 Статус ответа:', response.status);
 
             if (!response.ok) {
                 let errorText = '';
@@ -346,15 +371,12 @@
                 } catch {
                     errorText = await response.text();
                 }
-                throw new Error(`HTTP ${response.status}: ${response.statusText}\n${errorText}`);
+                throw new Error(`HTTP ${response.status}\n${errorText}`);
             }
 
             const data = await response.json();
+            console.log('📦 Получены данные:', data);
             
-            if (data.errorMessage) {
-                throw new Error(`n8n ошибка: ${data.errorMessage}`);
-            }
-
             return data;
         }
 
@@ -376,7 +398,6 @@
             if (saved) {
                 const data = JSON.parse(saved);
                 const months = Object.keys(data).sort().reverse();
-                
                 months.forEach(month => {
                     const option = document.createElement('option');
                     option.value = month;
@@ -401,12 +422,14 @@
                 return responseData;
             }
             
-            // Проверяем, может данные лежат прямо в объекте
+            // Если данные пришли в виде объекта с полями сделок
             if (typeof responseData === 'object' && responseData !== null) {
+                // Проверяем, есть ли массив где-то внутри
                 for (const key in responseData) {
                     if (Array.isArray(responseData[key]) && responseData[key].length > 0) {
                         const firstItem = responseData[key][0];
-                        if (firstItem && typeof firstItem === 'object' && firstItem.ufCrm52_1776580279 !== undefined) {
+                        if (firstItem && typeof firstItem === 'object' && 
+                            (firstItem.ufCrm52_1776580279 !== undefined || firstItem.ID !== undefined)) {
                             return responseData[key];
                         }
                     }
@@ -422,29 +445,31 @@
             const dealsByMonth = {};
             
             items.forEach(item => {
-                const engineerName = item.ufCrm52_1776580279;
-                const deviceName = item.ufCrm52_1776580300;
-                const dateStr = item.ufCrm52_1776580313;
-                const deviceId = item.ufCrm52_1776582412;
+                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID;
+                const deviceName = item.ufCrm52_1776580300 || item.TITLE;
+                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE;
+                const deviceId = item.ufCrm52_1776582412 || item.ID;
 
                 if (dateStr && engineerName) {
-                    const [d, m, y] = dateStr.split('.').map(Number);
-                    if (isNaN(d) || isNaN(m) || isNaN(y)) return;
-                    
-                    const itemDate = new Date(y, m - 1, d);
-                    if (isNaN(itemDate.getTime())) return;
-                    
-                    const monthKey = getMonthKey(itemDate);
-                    
-                    if (!dealsByMonth[monthKey]) {
-                        dealsByMonth[monthKey] = [];
+                    let parsedDate;
+                    if (dateStr.includes('.')) {
+                        const [d, m, y] = dateStr.split('.').map(Number);
+                        parsedDate = new Date(y, m - 1, d);
+                    } else {
+                        parsedDate = new Date(dateStr);
                     }
                     
+                    if (isNaN(parsedDate.getTime())) return;
+                    
+                    const monthKey = getMonthKey(parsedDate);
+                    
+                    if (!dealsByMonth[monthKey]) dealsByMonth[monthKey] = [];
+                    
                     dealsByMonth[monthKey].push({
-                        engineerName: engineerName,
-                        deviceName: deviceName,
+                        engineerName: String(engineerName),
+                        deviceName: String(deviceName || 'Не указано'),
                         dateStr: dateStr,
-                        deviceId: deviceId
+                        deviceId: String(deviceId || '')
                     });
                 }
             });
@@ -462,7 +487,7 @@
                         if (deal.engineerName.includes(engineer)) {
                             engineerData[engineer].count++;
                             engineerData[engineer].devices.push({
-                                name: deal.deviceName || 'Не указано',
+                                name: deal.deviceName,
                                 date: deal.dateStr,
                                 id: deal.deviceId
                             });
@@ -472,9 +497,13 @@
                 
                 for (const eng in engineerData) {
                     engineerData[eng].devices.sort((a, b) => {
-                        const [da, ma, ya] = a.date.split('.').map(Number);
-                        const [db, mb, yb] = b.date.split('.').map(Number);
-                        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                        try {
+                            const [da, ma, ya] = a.date.split('.').map(Number);
+                            const [db, mb, yb] = b.date.split('.').map(Number);
+                            return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                        } catch {
+                            return 0;
+                        }
                     });
                 }
                 
@@ -496,7 +525,7 @@
             
             if (changed) {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(allSavedData));
-                console.log('✅ Автоматически сохранены месяцы:', Object.keys(dealsByMonth));
+                console.log('✅ Сохранены месяцы:', Object.keys(dealsByMonth));
                 loadSavedMonths();
             }
         }
@@ -521,7 +550,7 @@
                 const items = extractItems(data);
                 
                 if (items.length === 0) {
-                    console.warn('Нет данных от вебхука, используем тестовые');
+                    console.warn('⚠️ Нет данных от вебхука, используем тестовые');
                     const testItems = generateTestData();
                     allItems = testItems;
                     currentData = { result: { items: testItems } };
@@ -529,6 +558,12 @@
                     
                     autoSaveByMonths(testItems);
                     processData(currentData, currentMonthKey);
+                    
+                    errorBlock.textContent = '⚠️ Вебхук не вернул данных. Показаны тестовые данные.';
+                    errorBlock.style.background = 'rgba(155,89,182,0.1)';
+                    errorBlock.style.borderColor = 'rgba(155,89,182,0.3)';
+                    errorBlock.style.color = '#9b59b6';
+                    errorBlock.classList.add('active');
                 } else {
                     allItems = items;
                     currentData = { result: { items: items } };
@@ -543,8 +578,16 @@
                 document.getElementById('monthSelect').value = 'current';
                 
             } catch (error) {
-                console.error('Error:', error);
-                errorBlock.textContent = `Ошибка: ${error.message}`;
+                console.error('❌ Ошибка:', error);
+                
+                let errorMessage = error.message;
+                if (error.message.includes('404')) {
+                    errorMessage = '❌ Вебхук не найден (404).\n\nПроверьте в n8n:\n1. Воркфлоу должен быть АКТИВИРОВАН (переключатель зеленый)\n2. Нажмите "Save" → "Activate"\n3. Путь вебхука: 24c7329a-f4b3-4698-acb1-3600c0a4d2db\n4. В ноде "Respond to Webhook" должно быть заполнено "Response Body"';
+                } else if (error.message.includes('500')) {
+                    errorMessage = '❌ Ошибка сервера (500).\n\nПроверьте в n8n:\n1. Есть ли нода "Respond to Webhook" в конце воркфлоу?\n2. Подключена ли она к предыдущей ноде?\n3. В ноде "Respond to Webhook" заполнено поле "Response Body"';
+                }
+                
+                errorBlock.textContent = errorMessage;
                 errorBlock.classList.add('active');
                 emptyState.style.display = 'block';
             } finally {
@@ -558,14 +601,15 @@
             const today = new Date();
             const dateStr = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`;
             
-            const testEngineers = ['Боянов', 'Миронов', 'Елагин'];
-            const testDevices = ['Сервер HP DL380', 'Коммутатор Cisco 2960', 'Маршрутизатор MikroTik', 'СХД Dell EMC'];
+            const testEngineers = ['Боянов', 'Миронов', 'Елагин', 'Стяжкин', 'Сосновский'];
+            const testDevices = ['Сервер HP DL380', 'Коммутатор Cisco 2960', 'Маршрутизатор MikroTik', 'СХД Dell EMC', 'Firewall FortiGate'];
             
             testEngineers.forEach((eng, idx) => {
-                for (let i = 0; i < 2 + idx; i++) {
+                const count = 1 + Math.floor(Math.random() * 3);
+                for (let i = 0; i < count; i++) {
                     testItems.push({
                         ufCrm52_1776580279: eng,
-                        ufCrm52_1776580300: testDevices[i % testDevices.length],
+                        ufCrm52_1776580300: testDevices[(idx + i) % testDevices.length],
                         ufCrm52_1776580313: dateStr,
                         ufCrm52_1776582412: `TEST-${idx+1}-${i+1}`
                     });
@@ -607,21 +651,28 @@
             const currentMonthDeals = [];
             
             items.forEach(item => {
-                const engineerName = item.ufCrm52_1776580279;
-                const deviceName = item.ufCrm52_1776580300;
-                const dateStr = item.ufCrm52_1776580313;
-                const deviceId = item.ufCrm52_1776582412;
+                const engineerName = item.ufCrm52_1776580279 || item.ASSIGNED_BY_ID;
+                const deviceName = item.ufCrm52_1776580300 || item.TITLE;
+                const dateStr = item.ufCrm52_1776580313 || item.DATE_CREATE;
+                const deviceId = item.ufCrm52_1776582412 || item.ID;
 
                 if (dateStr && engineerName) {
-                    const [d, m, y] = dateStr.split('.').map(Number);
-                    if (isNaN(d) || isNaN(m) || isNaN(y)) return;
+                    let itemDate;
+                    if (dateStr.includes('.')) {
+                        const [d, m, y] = dateStr.split('.').map(Number);
+                        itemDate = new Date(y, m - 1, d);
+                    } else {
+                        itemDate = new Date(dateStr);
+                    }
                     
-                    const itemDate = new Date(y, m - 1, d);
                     if (isNaN(itemDate.getTime())) return;
                     
                     if (itemDate.getMonth() + 1 === targetMonth && itemDate.getFullYear() === targetYear) {
                         currentMonthDeals.push({
-                            engineerName, deviceName, dateStr, deviceId
+                            engineerName: String(engineerName),
+                            deviceName: String(deviceName || 'Не указано'),
+                            dateStr: dateStr,
+                            deviceId: String(deviceId || '')
                         });
                     }
                 }
@@ -632,7 +683,7 @@
                     if (deal.engineerName.includes(engineer)) {
                         engineerData[engineer].count++;
                         engineerData[engineer].devices.push({
-                            name: deal.deviceName || 'Не указано',
+                            name: deal.deviceName,
                             date: deal.dateStr,
                             id: deal.deviceId
                         });
@@ -642,9 +693,13 @@
             
             for (const eng in engineerData) {
                 engineerData[eng].devices.sort((a, b) => {
-                    const [da, ma, ya] = a.date.split('.').map(Number);
-                    const [db, mb, yb] = b.date.split('.').map(Number);
-                    return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                    try {
+                        const [da, ma, ya] = a.date.split('.').map(Number);
+                        const [db, mb, yb] = b.date.split('.').map(Number);
+                        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
+                    } catch {
+                        return 0;
+                    }
                 });
             }
             
@@ -696,7 +751,7 @@
                                     <div class="device-name">${escapeHtml(device.name)}</div>
                                     <div class="device-date">${device.date}</div>
                                     <a href="https://b24-964ige.bitrix24.ru/crm/deal/show/${device.id}/" target="_blank" class="device-link">
-                                        ${device.id}
+                                        ${device.id || 'ID'}
                                     </a>
                                 </div>
                             `).join('') : '<div class="no-data" style="padding: 20px;">Нет данных</div>'}
@@ -717,7 +772,7 @@
         
         function escapeHtml(str) {
             if (!str) return '';
-            return str
+            return String(str)
                 .replace(/&/g, '&amp;')
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
