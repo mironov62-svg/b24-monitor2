@@ -327,7 +327,6 @@
         // ============================================
         
         async function fetchDeals() {
-            // Отправляем запрос к вебхуку с явным действием
             const response = await fetch(WEBHOOK_URL, {
                 method: 'POST',
                 headers: {
@@ -340,7 +339,6 @@
             });
 
             if (!response.ok) {
-                // Пытаемся получить текст ошибки для отладки
                 let errorText = '';
                 try {
                     const errorData = await response.json();
@@ -353,7 +351,6 @@
 
             const data = await response.json();
             
-            // Если пришла ошибка от n8n
             if (data.errorMessage) {
                 throw new Error(`n8n ошибка: ${data.errorMessage}`);
             }
@@ -392,10 +389,8 @@
         function extractItems(data) {
             if (!data) return [];
             
-            // Если данные пришли в виде массива с одним элементом
             const responseData = Array.isArray(data) ? data[0] : data;
             
-            // Проверяем разные структуры ответа
             if (responseData?.result?.items && Array.isArray(responseData.result.items)) {
                 return responseData.result.items;
             }
@@ -405,12 +400,11 @@
             if (Array.isArray(responseData)) {
                 return responseData;
             }
-            // Если это просто объект с данными
+            
+            // Проверяем, может данные лежат прямо в объекте
             if (typeof responseData === 'object' && responseData !== null) {
-                // Ищем любое поле, которое содержит массив
                 for (const key in responseData) {
                     if (Array.isArray(responseData[key]) && responseData[key].length > 0) {
-                        // Проверяем, похоже ли это на сделки
                         const firstItem = responseData[key][0];
                         if (firstItem && typeof firstItem === 'object' && firstItem.ufCrm52_1776580279 !== undefined) {
                             return responseData[key];
@@ -527,7 +521,6 @@
                 const items = extractItems(data);
                 
                 if (items.length === 0) {
-                    // Если нет данных, но запрос успешен — показываем тестовые данные
                     console.warn('Нет данных от вебхука, используем тестовые');
                     const testItems = generateTestData();
                     allItems = testItems;
@@ -560,7 +553,6 @@
             }
         }
 
-        // Функция для генерации тестовых данных, если вебхук не возвращает данные
         function generateTestData() {
             const testItems = [];
             const today = new Date();
